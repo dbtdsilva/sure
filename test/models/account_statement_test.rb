@@ -190,6 +190,31 @@ class AccountStatementTest < ActiveSupport::TestCase
     end
   end
 
+  test "discards the statement when its file cannot be stored so the upload can be retried" do
+    file_content = "date,amount\n2024-01-01,1\n"
+    ActiveStorage::Blob.service.stubs(:upload).raises(Errno::EACCES, "/rails/storage/ab")
+
+    assert_no_difference [ "AccountStatement.count", "ActiveStorage::Blob.count", "ActiveStorage::Attachment.count" ] do
+      assert_raises(Errno::EACCES) do
+        AccountStatement.create_from_upload!(
+          family: @family,
+          account: @account,
+          file: uploaded_file(filename: "statement.csv", content_type: "text/csv", content: file_content)
+        )
+      end
+    end
+
+    ActiveStorage::Blob.service.unstub(:upload)
+
+    assert_difference "AccountStatement.count", 1 do
+      AccountStatement.create_from_upload!(
+        family: @family,
+        account: @account,
+        file: uploaded_file(filename: "statement.csv", content_type: "text/csv", content: file_content)
+      )
+    end
+  end
+
   test "with_account scope keeps account linkage semantics while enum predicate follows review status" do
     linked_statement = AccountStatement.create_from_upload!(
       family: @family,

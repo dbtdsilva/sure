@@ -120,6 +120,7 @@ class AccountStatement < ApplicationRecord
       raise
     rescue StandardError
       purge_original_file(statement)
+      discard_unstored_statement(statement)
       raise
     end
 
@@ -178,6 +179,16 @@ class AccountStatement < ApplicationRecord
       statement.original_file.purge
     rescue StandardError => e
       Rails.logger.warn("AccountStatement staged blob cleanup failed: #{e.class}: #{e.message}")
+    end
+
+    # Active Storage writes the file only after the statement commits, so a failed
+    # write leaves a committed row with no file that later uploads see as a duplicate.
+    def discard_unstored_statement(statement)
+      return unless statement&.persisted?
+
+      statement.destroy!
+    rescue StandardError => e
+      Rails.logger.warn("AccountStatement unstored statement cleanup failed: #{e.class}: #{e.message}")
     end
 
     def balance_lookup_for(account, statements)
