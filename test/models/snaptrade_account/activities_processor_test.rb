@@ -412,6 +412,31 @@ class SnaptradeAccount::ActivitiesProcessorTest < ActiveSupport::TestCase
     assert_equal "Interest", interest.entryable.investment_activity_label
   end
 
+  # SnapTrade signs amounts from the account's perspective (positive = money in), and a FEE
+  # can be a credit: IBKR reports referral credits as FEE activities with a positive amount.
+  test "stores a positive FEE as an inflow" do
+    process_activities(
+      build_cash_activity(id: "fee_credit_001", type: "FEE", amount: 200.00, settlement_date: Date.current.to_s)
+    )
+
+    entry = snaptrade_entry("fee_credit_001")
+    assert_not_nil entry
+    assert_equal(-200.00, entry.amount.to_f, "a fee credited to the account must be stored as negative inflow")
+    assert_equal "Fee", entry.entryable.investment_activity_label
+  end
+
+  # Debit interest (e.g. IBKR margin interest) arrives as a negative INTEREST activity.
+  test "stores a negative INTEREST as an outflow" do
+    process_activities(
+      build_cash_activity(id: "debit_interest_001", type: "INTEREST", amount: -6.08, settlement_date: Date.current.to_s)
+    )
+
+    entry = snaptrade_entry("debit_interest_001")
+    assert_not_nil entry
+    assert_equal 6.08, entry.amount.to_f, "interest charged to the account must be stored as positive outflow"
+    assert_equal "Interest", entry.entryable.investment_activity_label
+  end
+
   test "processes INTERNAL_CASH_TRANSFER_IN and OUT with correct signs" do
     process_activities(
       build_cash_activity(id: "int_cash_in", type: "INTERNAL_CASH_TRANSFER_IN", amount: 250.00, settlement_date: Date.current.to_s),

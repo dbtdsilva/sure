@@ -57,8 +57,9 @@ class SnaptradeAccount::ActivitiesProcessor
     "TRANSFER_OUT" => { category: :cash, label: "Transfer", cash_flow: :outflow },
     "INTERNAL_CASH_TRANSFER_IN" => { category: :cash, label: "Transfer", cash_flow: :inflow },
     "INTERNAL_CASH_TRANSFER_OUT" => { category: :cash, label: "Transfer", cash_flow: :outflow },
-    "INTEREST" => { category: :cash, label: "Interest", cash_flow: :inflow },
-    "FEE" => { category: :cash, label: "Fee", cash_flow: :outflow },
+    # Interest can be earned or charged, and a fee can be a credit, so their direction comes from the amount.
+    "INTEREST" => { category: :cash, label: "Interest", cash_flow: :invert },
+    "FEE" => { category: :cash, label: "Fee", cash_flow: :invert },
     "TAX" => { category: :cash, label: "Fee", cash_flow: :outflow },
     "CASH" => { category: :cash, label: "Contribution", cash_flow: :inflow },
     "REBATE" => { category: :cash, label: "Other", cash_flow: :inflow },
@@ -392,7 +393,8 @@ class SnaptradeAccount::ActivitiesProcessor
       when :inflow
         -amount.abs  # Money in should be negative in Sure
       when :invert
-        # Direction is not encoded in the type (unlike TRANSFER_IN/TRANSFER_OUT), so the
+        # Direction is not encoded in the type (unlike TRANSFER_IN/TRANSFER_OUT): a TRANSFER,
+        # INTEREST or FEE can go either way (debit interest, a fee credit), so the
         # provider's sign is the only directional signal available. SnapTrade signs these
         # from the account's perspective (positive = money in), which is the inverse of
         # Sure's convention, so invert it rather than passing it through unchanged.
